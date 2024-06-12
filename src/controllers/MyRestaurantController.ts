@@ -3,6 +3,19 @@ import Restaurant from '../models/restaurant';
 import cloudinary from 'cloudinary';
 import mongoose from 'mongoose';
 
+export const getMyRestaurant = async (req: Request, res: Response) => {
+	try {
+		const restaurant = await Restaurant.findOne({ user: req.userId });
+		if (!restaurant) {
+			return res.status(404).json({ message: 'Restaurant not found' });
+		}
+		res.status(200).json(restaurant);
+	} catch (error) {
+		console.log(error);
+		return res.status(500).json({ message: 'Error fetching restaurant' });
+	}
+};
+
 export const createMyRestaurant = async (req: Request, res: Response) => {
 	try {
 		const existingRestaurant = await Restaurant.findOne({ user: req.userId });
@@ -18,7 +31,7 @@ export const createMyRestaurant = async (req: Request, res: Response) => {
 		const dataURI = `data:${image.mimetype};base64,${base64Image}`;
 
 		const uploadResponse = await cloudinary.v2.uploader.upload(dataURI);
-		console.log(uploadResponse);
+
 		const restaurant = new Restaurant(req.body);
 		restaurant.imageUrl = uploadResponse.url;
 		restaurant.user = new mongoose.Types.ObjectId(req.userId);

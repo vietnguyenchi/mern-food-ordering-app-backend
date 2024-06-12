@@ -1,6 +1,9 @@
 import express from 'express';
 import multer from 'multer';
-import { createMyRestaurant } from '../controllers/MyRestaurantController';
+import {
+	createMyRestaurant,
+	getMyRestaurant,
+} from '../controllers/MyRestaurantController';
 import { jwtCheck, jwtParse } from '../middleware/auth';
 import { validateMyRestaurantRequest } from '../middleware/vaidation';
 
@@ -12,6 +15,8 @@ const upload = multer({
 		fileSize: 5 * 1024 * 1024,
 	},
 });
+
+router.get('/', jwtCheck, jwtParse, getMyRestaurant);
 
 router.post(
 	'/',

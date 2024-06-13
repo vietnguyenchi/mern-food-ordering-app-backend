@@ -1,6 +1,23 @@
 import { Request, Response, query } from 'express';
 import Restaurant from '../models/restaurant';
 
+export const getRestaurant = async (req: Request, res: Response) => {
+	try {
+		const restaurantId = req.params.restaurantId;
+
+		const restaurant = await Restaurant.findById(restaurantId);
+
+		if (!restaurant) {
+			return res.status(404).json({ message: 'Restaurant not found' });
+		}
+
+		res.status(200).json(restaurant);
+	} catch (error) {
+		console.log(error);
+		res.status(500).json({ message: 'Something went wrong' });
+	}
+};
+
 export const searchRestaurant = async (req: Request, res: Response) => {
 	try {
 		const city = req.params.city;
@@ -49,7 +66,7 @@ export const searchRestaurant = async (req: Request, res: Response) => {
 			.limit(pageSize)
 			.lean();
 
-		console.log(query);
+		// console.log(query);
 
 		const total = await Restaurant.countDocuments(query);
 

@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import Restaurant, { MenuItemType } from '../models/restaurant';
+import Order from '../models/order';
 
 const STRIPE = new Stripe(process.env.STRIPE_API_KEY as string);
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET as string;
 
 type CheckoutSessionRequest = {
 	cartItems: {
@@ -14,10 +16,42 @@ type CheckoutSessionRequest = {
 	deliveryDetails: {
 		email: string;
 		name: string;
-		addessLine1: string;
+		addressLine1: string;
 		city: string;
+		country: string;
 	};
 	restaurantId: string;
+};
+
+export const stripeWebhookHandler = async (req: Request, res: Response) => {
+	let event;
+
+	try {
+		const sig = req.headers['stripe-signature'] as string;
+		event = STRIPE.webhooks.constructEvent(
+			req.body,
+			sig,
+			STRIPE_WEBHOOK_SECRET
+		);
+	} catch (error: any) {
+		console.log(error);
+		return res.status(400).send('Webhook Error: ' + error.message);
+	}
+
+	if (event.type === 'checkout.session.completed') {
+		const order = await Order.findById(event.data.object.metadata?.orderId);
+
+		if (!order) {
+			return res.status(400).json({ message: 'Order not found' });
+		}
+
+		order.totalAmount = event.data.object.amount_total;
+		order.status = 'paid';
+
+		await order.save();
+	}
+
+	res.status(200).send();
 };
 
 export const createCheckoutSession = async (req: Request, res: Response) => {
@@ -32,6 +66,15 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 			throw new Error('Restaurant not found');
 		}
 
+		const newOrder = new Order({
+			restaurant: restaurant._id,
+			user: req.userId,
+			status: 'placed',
+			deliveryDetails: checkoutSessionRequest.deliveryDetails,
+			cartItems: checkoutSessionRequest.cartItems,
+			createdAt: new Date(),
+		});
+
 		const lineItems = createLineItems(
 			checkoutSessionRequest,
 			restaurant.menuItems
@@ -39,7 +82,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 
 		const session = await createSession(
 			lineItems,
-			'TEST_ORDER_ID',
+			newOrder._id.toString(),
 			restaurant.deliveryPrice,
 			restaurant._id.toString()
 		);
@@ -48,6 +91,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 			res.status(500).json({ message: 'Session creation failed' });
 		}
 
+		await newOrder.save();
 		res.status(200).json({ url: session.url });
 	} catch (error: any) {
 		console.log(error);
@@ -112,6 +156,8 @@ const createSession = async (
 		success_url: `${FRONTEND_URL}/order-status?success=true`,
 		cancel_url: `${FRONTEND_URL}/detail/${restaurantId}?canceled=true`,
 	});
+
+	// console.log(sessionData);
 
 	return sessionData;
 };

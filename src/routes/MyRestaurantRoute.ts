@@ -3,7 +3,9 @@ import multer from 'multer';
 import {
 	createMyRestaurant,
 	getMyRestaurant,
+	getMyRestaurantOrder,
 	updateMyRestaurant,
+	updateOrderStatus,
 } from '../controllers/MyRestaurantController';
 import { jwtCheck, jwtParse } from '../middleware/auth';
 import { validateMyRestaurantRequest } from '../middleware/vaidation';
@@ -16,6 +18,10 @@ const upload = multer({
 		fileSize: 5 * 1024 * 1024,
 	},
 });
+
+router.get('/order', jwtCheck, jwtParse, getMyRestaurantOrder);
+
+router.patch('/order/:orderId/status', jwtCheck, jwtParse, updateOrderStatus);
 
 router.get('/', jwtCheck, jwtParse, getMyRestaurant);
 
